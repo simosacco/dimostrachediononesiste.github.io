@@ -221,339 +221,383 @@
     </div>
 
     <script>
-        // --- CONFIGURAZIONE SERVIZI ESTERNI ---
-        
-        // 1. Incolla qui il tuo config di Firebase
-        const firebaseConfig = {
-            apiKey: "IL-TUO-API-KEY",
-            authDomain: "TUO-PROGETTO.firebaseapp.com",
-            projectId: "TUO-PROGETTO",
-            storageBucket: "TUO-PROGETTO.appspot.com",
-            messagingSenderId: "ID",
-            appId: "APP-ID"
-        };
+// --- CONFIGURAZIONE SERVIZI ESTERNI ---
 
-        // 2. Incolla qui i tuoi dati EmailJS
-        const EJS_PUBLIC_KEY = "TUA_PUBLIC_KEY";
-        const EJS_SERVICE_ID = "TUO_SERVICE_ID";
-        const EJS_TEMPLATE_ID = "TUO_TEMPLATE_ID";
+// 1. Configurazione Firebase (Database Esterno)
+const firebaseConfig = {
+    apiKey: "AIzaSyDInnrtoQngbkvE6ngcHaXL02a0XryA6hQ",
+    authDomain: "clouboard.firebaseapp.com",
+    projectId: "clouboard",
+    storageBucket: "clouboard.firebasestorage.app",
+    messagingSenderId: "906289976459",
+    appId: "1:906289976459:web:a42dc7e487704436fab08e",
+    measurementId: "G-HN3ZDKXEHD"
+};
 
-        // Inizializzazione (se firebaseConfig è valido)
-        if(firebaseConfig.apiKey !== "IL-TUO-API-KEY") {
-            firebase.initializeApp(firebaseConfig);
-            var db = firebase.firestore();
+// Inizializzazione Firebase e Firestore
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// 2. Configurazione EmailJS
+const EJS_PUBLIC_KEY = "BiYrbb389y66x70Xk";
+const EJS_SERVICE_ID = "service_dxwwddd";
+const EJS_TEMPLATE_ID = "template_8qomkp7";
+
+// Inizializzazione EmailJS
+emailjs.init(EJS_PUBLIC_KEY);
+
+// --- STATO APPLICAZIONE ---
+const MASTER_KEY_OBF = "Q2ljY2lvYmVsbG8="; // Password Owner: "Cicciobello"
+const getMaster = () => atob(MASTER_KEY_OBF);
+
+// Lo stato dell'utente (nome) rimane locale sul dispositivo, il resto va nel Cloud
+let app = {
+    owner: false,
+    user: localStorage.getItem('board_user') || 'Anonimo',
+    notes: [],
+    settings: { emails: [], active: true },
+    pDomande: "Caricamento in corso...",
+    pAbout: "Caricamento in corso..."
+};
+
+let activeId = null;
+
+// --- CARICAMENTO E SINCRONIZZAZIONE REAL-TIME ---
+window.onload = () => {
+    // onSnapshot ascolta il database: ogni volta che qualcuno modifica qualcosa, l'app si aggiorna per tutti
+    db.collection("board").doc("data").onSnapshot((doc) => {
+        if (doc.exists) {
+            const data = doc.data();
+            app.notes = data.notes || [];
+            app.settings = data.settings || { emails: [], active: true };
+            app.pDomande = data.pDomande || "Vuoto";
+            app.pAbout = data.pAbout || "Vuoto";
         } else {
-            console.warn("Firebase non configurato. Uso LocalStorage.");
+            // Se il documento non esiste ancora, lo crea
+            saveToCloud();
         }
+        
+        syncUI();
+        
+        // Se l'utente sta guardando una pagina statica, aggiorna il testo in tempo reale
+        if(!document.getElementById('sec-domande').classList.contains('hidden')) renderStatic('domande');
+        if(!document.getElementById('sec-about').classList.contains('hidden')) renderStatic('about');
+    });
 
-        emailjs.init(EJS_PUBLIC_KEY);
+    navigate('lavagna');
+};
 
-        // --- STATO APPLICAZIONE ---
-        const MASTER_KEY_OBF = "Q2ljY2lvYmVsbG8="; // "Cicciobello"
-        const getMaster = () => atob(MASTER_KEY_OBF);
+function syncUI() {
+    const tag = document.getElementById('userNameDisplay');
+    if(app.owner) {
+        app.user = "Owner";
+        tag.classList.add('is-owner-name');
+    } else {
+        tag.classList.remove('is-owner-name');
+        if(app.user === "Owner") app.user = localStorage.getItem('board_user') || "Anonimo";
+    }
+    tag.innerText = app.user;
+    renderNotes();
+    renderSettings();
+}
 
-        let app = {
-            owner: false,
-            user: localStorage.getItem('board_user') || 'Anonimo',
-            notes: JSON.parse(localStorage.getItem('board_notes')) || [],
-            settings: JSON.parse(localStorage.getItem('board_settings')) || { emails: [], active: true },
-            pDomande: localStorage.getItem('board_domande') || "Vuoto",
-            pAbout: localStorage.getItem('board_about') || "Vuoto"
+// --- SALVATAGGIO CLOUD ---
+function saveToCloud() {
+    // Scrive l'intero stato sul database Firebase
+    db.collection("board").doc("data").set({
+        notes: app.notes,
+        settings: app.settings,
+        pDomande: app.pDomande,
+        pAbout: app.pAbout
+    }).catch(error => {
+        console.error("Errore di salvataggio su Firebase:", error);
+        alert("Errore di connessione al database.");
+    });
+}
+
+// Sostituisce il vecchio salvataggio locale
+function save() {
+    saveToCloud();
+}
+
+// --- NAVIGAZIONE ---
+function navigate(page) {
+    document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+    ['lavagna', 'domande', 'about', 'settings'].forEach(s => document.getElementById(`sec-${s}`).classList.add('hidden'));
+    document.getElementById(`sec-${page}`).classList.remove('hidden');
+    
+    const activeBtn = Array.from(document.querySelectorAll('nav button')).find(b => b.innerText.toLowerCase().includes(page));
+    if(activeBtn) activeBtn.classList.add('active');
+
+    if(page === 'domande' || page === 'about') renderStatic(page);
+    document.getElementById('fabBtn').style.display = (page === 'lavagna') ? 'flex' : 'none';
+}
+
+// --- LOGIN OWNER ---
+function openLoginModal() {
+    if(app.owner) {
+        app.owner = false;
+        document.getElementById('loginBtn').innerText = "Login";
+        document.getElementById('ownerBadge').style.display = 'none';
+        document.getElementById('navSettings').classList.add('hidden');
+        syncUI();
+    } else {
+        showModal('modalLogin');
+    }
+}
+
+function validateOwner() {
+    const p = document.getElementById('ownerPwd').value;
+    if(p === getMaster()) {
+        app.owner = true;
+        document.getElementById('loginBtn').innerText = "Logout";
+        document.getElementById('ownerBadge').style.display = 'inline-block';
+        document.getElementById('navSettings').classList.remove('hidden');
+        closeAllModals();
+        syncUI();
+    } else alert("Accesso Negato");
+    document.getElementById('ownerPwd').value = '';
+}
+
+// --- PROFILO UTENTE ---
+function openNameModal() {
+    if(app.owner) return;
+    document.getElementById('nameIn').value = app.user;
+    showModal('modalName');
+}
+
+function updateProfileName() {
+    const n = document.getElementById('nameIn').value.trim();
+    app.user = n.substring(0, 20) || "Anonimo";
+    localStorage.setItem('board_user', app.user); // Questo rimane locale per ricordare chi è l'utente su questo PC
+    syncUI();
+    closeAllModals();
+}
+
+// --- GESTIONE NOTE ---
+function openNoteModal(id = null) {
+    activeId = id;
+    const tIn = document.getElementById('noteTitle');
+    const txtIn = document.getElementById('noteText');
+    const passIn = document.getElementById('notePass');
+    const triggers = document.getElementById('ownerTriggers');
+
+    if(id) {
+        const n = app.notes.find(x => x.id === id);
+        tIn.value = n.title;
+        txtIn.value = n.text;
+        passIn.value = n.password;
+        document.getElementById('noteHeader').innerText = "Modifica Nota";
+        
+        if(app.owner) {
+            triggers.classList.remove('hidden');
+            document.getElementById('triggerEdit').checked = n.notifyEdit || false;
+            document.getElementById('triggerComment').checked = n.notifyComm || false;
+        } else {
+            triggers.classList.add('hidden');
+        }
+    } else {
+        tIn.value = ''; txtIn.value = ''; passIn.value = '';
+        document.getElementById('noteHeader').innerText = "Nuova Nota";
+        triggers.classList.add('hidden');
+    }
+    showModal('modalNote');
+}
+
+function submitNote() {
+    const t = document.getElementById('noteTitle').value.trim();
+    const txt = document.getElementById('noteText').value.trim();
+    const p = document.getElementById('notePass').value.trim();
+
+    if(!t || !txt || !p) return alert("Compila tutti i campi!");
+
+    if(activeId) {
+        const i = app.notes.findIndex(x => x.id === activeId);
+        const old = app.notes[i];
+        app.notes[i] = {
+            ...old, title: t, text: txt, password: p,
+            edited: new Date().toLocaleString(),
+            notifyEdit: app.owner ? document.getElementById('triggerEdit').checked : old.notifyEdit,
+            notifyComm: app.owner ? document.getElementById('triggerComment').checked : old.notifyComm
         };
-
-        let activeId = null;
-
-        // --- CARICAMENTO ---
-        window.onload = () => {
-            syncUI();
-            navigate('lavagna');
+        if(app.notes[i].notifyEdit) notifyAll(t, "Nota Modificata: " + txt);
+    } else {
+        const nuovo = {
+            id: Date.now().toString(),
+            author: app.user,
+            title: t, text: txt, password: p,
+            date: new Date().toLocaleString(),
+            comments: [],
+            notifyEdit: false, notifyComm: false
         };
+        app.notes.unshift(nuovo);
+        notifyAll(t, "Nuova Nota Creata: " + txt);
+    }
+    save();
+    closeAllModals();
+}
 
-        function syncUI() {
-            const tag = document.getElementById('userNameDisplay');
-            if(app.owner) {
-                app.user = "Owner";
-                tag.classList.add('is-owner-name');
-            } else {
-                tag.classList.remove('is-owner-name');
-                if(app.user === "Owner") app.user = "Anonimo";
-            }
-            tag.innerText = app.user;
-            renderNotes();
-            renderSettings();
-        }
-
-        // --- NAVIGAZIONE ---
-        function navigate(page) {
-            document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
-            ['lavagna', 'domande', 'about', 'settings'].forEach(s => document.getElementById(`sec-${s}`).classList.add('hidden'));
-            document.getElementById(`sec-${page}`).classList.remove('hidden');
-            
-            const activeBtn = Array.from(document.querySelectorAll('nav button')).find(b => b.innerText.toLowerCase().includes(page));
-            if(activeBtn) activeBtn.classList.add('active');
-
-            if(page === 'domande' || page === 'about') renderStatic(page);
-            document.getElementById('fabBtn').style.display = (page === 'lavagna') ? 'flex' : 'none';
-        }
-
-        // --- LOGIN OWNER ---
-        function openLoginModal() {
-            if(app.owner) {
-                app.owner = false;
-                document.getElementById('loginBtn').innerText = "Login";
-                document.getElementById('ownerBadge').style.display = 'none';
-                document.getElementById('navSettings').classList.add('hidden');
-                syncUI();
-            } else {
-                showModal('modalLogin');
-            }
-        }
-
-        function validateOwner() {
-            const p = document.getElementById('ownerPwd').value;
-            if(p === getMaster()) {
-                app.owner = true;
-                document.getElementById('loginBtn').innerText = "Logout";
-                document.getElementById('ownerBadge').style.display = 'inline-block';
-                document.getElementById('navSettings').classList.remove('hidden');
+function checkAction(id, type) {
+    activeId = id;
+    if(app.owner) {
+        if(type === 'edit') openNoteModal(id);
+        else if(confirm("Eliminare definitivamente?")) { app.notes = app.notes.filter(x => x.id !== id); save(); }
+    } else {
+        showModal('modalVerify');
+        document.getElementById('verifyBtn').onclick = () => {
+            const pass = document.getElementById('verifyPass').value;
+            const n = app.notes.find(x => x.id === id);
+            if(pass === n.password) {
                 closeAllModals();
-                syncUI();
-            } else alert("Accesso Negato");
-            document.getElementById('ownerPwd').value = '';
-        }
-
-        // --- PROFILO UTENTE ---
-        function openNameModal() {
-            if(app.owner) return;
-            document.getElementById('nameIn').value = app.user;
-            showModal('modalName');
-        }
-
-        function updateProfileName() {
-            const n = document.getElementById('nameIn').value.trim();
-            app.user = n.substring(0, 20) || "Anonimo";
-            localStorage.setItem('board_user', app.user);
-            syncUI();
-            closeAllModals();
-        }
-
-        // --- GESTIONE NOTE ---
-        function openNoteModal(id = null) {
-            activeId = id;
-            const tIn = document.getElementById('noteTitle');
-            const txtIn = document.getElementById('noteText');
-            const passIn = document.getElementById('notePass');
-            const triggers = document.getElementById('ownerTriggers');
-
-            if(id) {
-                const n = app.notes.find(x => x.id === id);
-                tIn.value = n.title;
-                txtIn.value = n.text;
-                passIn.value = n.password;
-                document.getElementById('noteHeader').innerText = "Modifica Nota";
-                
-                if(app.owner) {
-                    triggers.classList.remove('hidden');
-                    document.getElementById('triggerEdit').checked = n.notifyEdit || false;
-                    document.getElementById('triggerComment').checked = n.notifyComm || false;
-                } else {
-                    triggers.classList.add('hidden');
-                }
-            } else {
-                tIn.value = ''; txtIn.value = ''; passIn.value = '';
-                document.getElementById('noteHeader').innerText = "Nuova Nota";
-                triggers.classList.add('hidden');
-            }
-            showModal('modalNote');
-        }
-
-        function submitNote() {
-            const t = document.getElementById('noteTitle').value.trim();
-            const txt = document.getElementById('noteText').value.trim();
-            const p = document.getElementById('notePass').value.trim();
-
-            if(!t || !txt || !p) return alert("Compila tutto!");
-
-            if(activeId) {
-                const i = app.notes.findIndex(x => x.id === activeId);
-                const old = app.notes[i];
-                app.notes[i] = {
-                    ...old, title: t, text: txt, password: p,
-                    edited: new Date().toLocaleString(),
-                    notifyEdit: app.owner ? document.getElementById('triggerEdit').checked : old.notifyEdit,
-                    notifyComm: app.owner ? document.getElementById('triggerComment').checked : old.notifyComm
-                };
-                if(app.notes[i].notifyEdit) notifyAll(t, "Nota Modificata: " + txt);
-            } else {
-                const nuovo = {
-                    id: Date.now().toString(),
-                    author: app.user,
-                    title: t, text: txt, password: p,
-                    date: new Date().toLocaleString(),
-                    comments: [],
-                    notifyEdit: false, notifyComm: false
-                };
-                app.notes.unshift(nuovo);
-                notifyAll(t, "Nuova Nota Creata: " + txt);
-            }
-            save();
-            closeAllModals();
-        }
-
-        function checkAction(id, type) {
-            activeId = id;
-            if(app.owner) {
                 if(type === 'edit') openNoteModal(id);
-                else if(confirm("Eliminare?")) { app.notes = app.notes.filter(x => x.id !== id); save(); }
-            } else {
-                showModal('modalVerify');
-                document.getElementById('verifyBtn').onclick = () => {
-                    const pass = document.getElementById('verifyPass').value;
-                    const n = app.notes.find(x => x.id === id);
-                    if(pass === n.password) {
-                        closeAllModals();
-                        if(type === 'edit') openNoteModal(id);
-                        else { if(confirm("Sicuro?")) { app.notes = app.notes.filter(x => x.id !== id); save(); } }
-                    } else alert("Errata");
-                    document.getElementById('verifyPass').value = '';
-                };
-            }
-        }
+                else { if(confirm("Sei sicuro di voler eliminare la nota?")) { app.notes = app.notes.filter(x => x.id !== id); save(); } }
+            } else alert("Password Errata");
+            document.getElementById('verifyPass').value = '';
+        };
+    }
+}
 
-        // --- COMMENTI ---
-        function openComment(id) { activeId = id; showModal('modalComment'); }
+// --- COMMENTI ---
+function openComment(id) { activeId = id; showModal('modalComment'); }
 
-        function submitComment() {
-            const txt = document.getElementById('commText').value.trim();
-            if(!txt) return;
-            const i = app.notes.findIndex(x => x.id === activeId);
-            app.notes[i].comments.push({ user: app.user, text: txt, time: new Date().toLocaleString() });
-            
-            if(app.notes[i].notifyComm) notifyAll(app.notes[i].title, `Nuovo commento da ${app.user}: ${txt}`);
+function submitComment() {
+    const txt = document.getElementById('commText').value.trim();
+    if(!txt) return;
+    const i = app.notes.findIndex(x => x.id === activeId);
+    app.notes[i].comments.push({ user: app.user, text: txt, time: new Date().toLocaleString() });
+    
+    if(app.notes[i].notifyComm) notifyAll(app.notes[i].title, `Nuovo commento da ${app.user}: ${txt}`);
 
-            document.getElementById('commText').value = '';
-            save();
-            closeAllModals();
-        }
+    document.getElementById('commText').value = '';
+    save();
+    closeAllModals();
+}
 
-        // --- NOTIFICHE EMAILJS ---
-        function notifyAll(title, msg) {
-            if(!app.settings.active || app.settings.emails.length === 0) return;
-            
-            app.settings.emails.forEach(email => {
-                emailjs.send(EJS_SERVICE_ID, EJS_TEMPLATE_ID, {
-                    subject: "NOTIFICA SITO (" + title + ")",
-                    to_email: email,
-                    message: msg
-                }).then(() => console.log("Email inviata a " + email));
-            });
-        }
+// --- NOTIFICHE EMAILJS ---
+function notifyAll(title, msg) {
+    if(!app.settings.active || app.settings.emails.length === 0) return;
+    
+    app.settings.emails.forEach(email => {
+        emailjs.send(EJS_SERVICE_ID, EJS_TEMPLATE_ID, {
+            subject: "NOTIFICA CLOUDBOARD: " + title,
+            to_email: email,
+            message: msg
+        }).then(
+            () => console.log("Email inviata con successo a " + email),
+            (error) => console.error("Errore invio email a " + email, error)
+        );
+    });
+}
 
-        // --- PAGINE STATICHE ---
-        function renderStatic(p) {
-            const disp = document.getElementById(`${p}Display`);
-            const edit = document.getElementById(`${p}EditMode`);
-            if(app.owner) {
-                disp.classList.add('hidden'); edit.classList.remove('hidden');
-                document.getElementById(`${p}Editor`).value = app[`p${p.charAt(0).toUpperCase() + p.slice(1)}`];
-            } else {
-                edit.classList.add('hidden'); disp.classList.remove('hidden');
-                disp.innerText = app[`p${p.charAt(0).toUpperCase() + p.slice(1)}`];
-            }
-        }
+// --- PAGINE STATICHE ---
+function renderStatic(p) {
+    const disp = document.getElementById(`${p}Display`);
+    const edit = document.getElementById(`${p}EditMode`);
+    if(app.owner) {
+        disp.classList.add('hidden'); edit.classList.remove('hidden');
+        document.getElementById(`${p}Editor`).value = app[`p${p.charAt(0).toUpperCase() + p.slice(1)}`];
+    } else {
+        edit.classList.add('hidden'); disp.classList.remove('hidden');
+        disp.innerText = app[`p${p.charAt(0).toUpperCase() + p.slice(1)}`];
+    }
+}
 
-        function savePageData(p) {
-            const val = document.getElementById(`${p}Editor`).value;
-            app[`p${p.charAt(0).toUpperCase() + p.slice(1)}`] = val;
-            localStorage.setItem(`board_${p}`, val);
-            alert("Pagina Aggiornata!");
-            renderStatic(p);
-        }
+function savePageData(p) {
+    const val = document.getElementById(`${p}Editor`).value;
+    app[`p${p.charAt(0).toUpperCase() + p.slice(1)}`] = val;
+    saveToCloud(); // Salva su Firebase
+    alert("Pagina aggiornata e salvata nel database!");
+    renderStatic(p);
+}
 
-        // --- SETTINGS ---
-        function renderSettings() {
-            const container = document.getElementById('emailTags');
-            container.innerHTML = '';
-            app.settings.emails.forEach((e, i) => {
-                container.innerHTML += `<div style="background:var(--primary); color:white; padding:5px 12px; border-radius:20px; font-size:0.8rem">${e} <span onclick="removeEmail(${i})" style="margin-left:8px; cursor:pointer; font-weight:bold">×</span></div>`;
-            });
-            document.getElementById('globalNotify').checked = app.settings.active;
-        }
+// --- SETTINGS ---
+function renderSettings() {
+    const container = document.getElementById('emailTags');
+    container.innerHTML = '';
+    app.settings.emails.forEach((e, i) => {
+        container.innerHTML += `<div style="background:var(--primary); color:white; padding:5px 12px; border-radius:20px; font-size:0.8rem">${e} <span onclick="removeEmail(${i})" style="margin-left:8px; cursor:pointer; font-weight:bold">×</span></div>`;
+    });
+    document.getElementById('globalNotify').checked = app.settings.active;
+}
 
-        function addEmail() {
-            const em = document.getElementById('emailInput').value.trim();
-            if(em.includes('@')) { app.settings.emails.push(em); updateSettings(); document.getElementById('emailInput').value = ''; }
-        }
+function addEmail() {
+    const em = document.getElementById('emailInput').value.trim();
+    if(em.includes('@')) { 
+        app.settings.emails.push(em); 
+        updateSettings(); 
+        document.getElementById('emailInput').value = ''; 
+    }
+}
 
-        function removeEmail(i) { app.settings.emails.splice(i, 1); updateSettings(); }
+function removeEmail(i) { 
+    app.settings.emails.splice(i, 1); 
+    updateSettings(); 
+}
 
-        function updateSettings() {
-            app.settings.active = document.getElementById('globalNotify').checked;
-            localStorage.setItem('board_settings', JSON.stringify(app.settings));
-            renderSettings();
-        }
+function updateSettings() {
+    app.settings.active = document.getElementById('globalNotify').checked;
+    saveToCloud(); // Salva le impostazioni su Firebase
+}
 
-        // --- RENDER NOTE ---
-        function renderNotes() {
-            const container = document.getElementById('notesContainer');
-            container.innerHTML = app.notes.length ? '' : '<div style="text-align:center; padding:50px; color:var(--text-muted)">Nessuna nota presente.</div>';
-            
-            app.notes.forEach(n => {
-                const isOwnerNote = n.author === "Owner";
-                let comms = n.comments.map((c, i) => `
-                    <div class="comment">
-                        <div>
-                            <span class="comment-user ${c.user === 'Owner' ? 'red-name' : ''}">${c.user}</span>
-                            <span style="font-size:0.7rem; color:var(--text-muted)">${c.time}</span>
-                            <div style="margin-top:5px">${c.text}</div>
-                        </div>
-                        ${app.owner ? `<button onclick="delComment('${n.id}', ${i})" style="border:none; color:red; background:none; cursor:pointer; font-size:1.2rem">×</button>` : ''}
+// --- RENDER NOTE ---
+function renderNotes() {
+    const container = document.getElementById('notesContainer');
+    container.innerHTML = app.notes.length ? '' : '<div style="text-align:center; padding:50px; color:var(--text-muted)">Nessuna nota presente nel database.</div>';
+    
+    app.notes.forEach(n => {
+        const isOwnerNote = n.author === "Owner";
+        let comms = n.comments.map((c, i) => `
+            <div class="comment">
+                <div>
+                    <span class="comment-user ${c.user === 'Owner' ? 'red-name' : ''}">${c.user}</span>
+                    <span style="font-size:0.7rem; color:var(--text-muted)">${c.time}</span>
+                    <div style="margin-top:5px">${c.text}</div>
+                </div>
+                ${app.owner ? `<button onclick="delComment('${n.id}', ${i})" style="border:none; color:red; background:none; cursor:pointer; font-size:1.2rem">×</button>` : ''}
+            </div>
+        `).join('');
+
+        container.innerHTML += `
+            <div class="note-card">
+                <div class="note-header">
+                    <div>
+                        <span class="note-author ${isOwnerNote ? 'red-name' : ''}">Autore: ${n.author}</span>
+                        <div class="note-title">${n.title}</div>
                     </div>
-                `).join('');
+                    <div class="note-meta">${n.date} ${n.edited ? `<br><span style="color:orange">Modificata: ${n.edited}</span>` : ''}</div>
+                </div>
+                ${app.owner ? `<div style="background:#eff6ff; padding:8px; border-radius:8px; font-size:0.75rem; color:blue; margin-bottom:15px; font-family:monospace"><b>Owner Info:</b> Pass -> ${n.password} | Notifiche: ${n.notifyEdit?'Ed':'No'}/${n.notifyComm?'Co':'No'}</div>` : ''}
+                <div class="note-text">${n.text}</div>
+                <div style="display:flex; gap:12px; margin-bottom:20px">
+                    <button class="user-tag" style="background:none" onclick="checkAction('${n.id}', 'edit')">✏️ Modifica</button>
+                    <button class="user-tag" style="background:none; color:var(--danger)" onclick="checkAction('${n.id}', 'del')">🗑️ Elimina</button>
+                    <button class="user-tag" style="background:var(--primary); color:white; border:none" onclick="openComment('${n.id}')">💬 Rispondi</button>
+                </div>
+                <div class="comments-section">
+                    <div style="font-weight:900; font-size:0.75rem; margin-bottom:15px; color:var(--text-muted); text-transform:uppercase">Discussione (${n.comments.length})</div>
+                    ${comms}
+                </div>
+            </div>
+        `;
+    });
+}
 
-                container.innerHTML += `
-                    <div class="note-card">
-                        <div class="note-header">
-                            <div>
-                                <span class="note-author ${isOwnerNote ? 'red-name' : ''}">Autore: ${n.author}</span>
-                                <div class="note-title">${n.title}</div>
-                            </div>
-                            <div class="note-meta">${n.date} ${n.edited ? `<br><span style="color:orange">Modificata: ${n.edited}</span>` : ''}</div>
-                        </div>
-                        ${app.owner ? `<div style="background:#eff6ff; padding:8px; border-radius:8px; font-size:0.75rem; color:blue; margin-bottom:15px; font-family:monospace"><b>Owner Info:</b> Pass -> ${n.password} | Notifiche: ${n.notifyEdit?'Ed':'No'}/${n.notifyComm?'Co':'No'}</div>` : ''}
-                        <div class="note-text">${n.text}</div>
-                        <div style="display:flex; gap:12px; margin-bottom:20px">
-                            <button class="user-tag" style="background:none" onclick="checkAction('${n.id}', 'edit')">✏️ Modifica</button>
-                            <button class="user-tag" style="background:none; color:var(--danger)" onclick="checkAction('${n.id}', 'del')">🗑️ Elimina</button>
-                            <button class="user-tag" style="background:var(--primary); color:white; border:none" onclick="openComment('${n.id}')">💬 Rispondi</button>
-                        </div>
-                        <div class="comments-section">
-                            <div style="font-weight:900; font-size:0.75rem; margin-bottom:15px; color:var(--text-muted); text-transform:uppercase">Discussione (${n.comments.length})</div>
-                            ${comms}
-                        </div>
-                    </div>
-                `;
-            });
-        }
+function delComment(nId, cIdx) {
+    const i = app.notes.findIndex(x => x.id === nId);
+    app.notes[i].comments.splice(cIdx, 1);
+    save();
+}
 
-        function delComment(nId, cIdx) {
-            const i = app.notes.findIndex(x => x.id === nId);
-            app.notes[i].comments.splice(cIdx, 1);
-            save();
-        }
+function showModal(id) {
+    document.querySelectorAll('.modal-box').forEach(b => b.classList.add('hidden'));
+    document.getElementById(id).classList.remove('hidden');
+    document.getElementById('modalOverlay').classList.add('active');
+}
 
-        function save() {
-            localStorage.setItem('board_notes', JSON.stringify(app.notes));
-            renderNotes();
-        }
-
-        function showModal(id) {
-            document.querySelectorAll('.modal-box').forEach(b => b.classList.add('hidden'));
-            document.getElementById(id).classList.remove('hidden');
-            document.getElementById('modalOverlay').classList.add('active');
-        }
-
-        function closeAllModals() { document.getElementById('modalOverlay').classList.remove('active'); }
+function closeAllModals() { 
+    document.getElementById('modalOverlay').classList.remove('active'); 
+}
     </script>
 </body>
 </html>
+
