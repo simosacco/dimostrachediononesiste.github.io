@@ -256,7 +256,7 @@ let app = {
     user: localStorage.getItem('board_user') || 'Anonimo',
     notes: [],
     settings: { emails: [], active: true },
-    prisposte: "Caricamento in corso...",
+    pRisposte: "Caricamento in corso...",
     pAbout: "Caricamento in corso..."
 };
 
@@ -270,7 +270,7 @@ window.onload = () => {
             const data = doc.data();
             app.notes = data.notes || [];
             app.settings = data.settings || { emails: [], active: true };
-            app.prisposte = data.prisposte || "Vuoto";
+            app.pRisposte = data.pRisposte || "Vuoto";
             app.pAbout = data.pAbout || "Vuoto";
         } else {
             // Se il documento non esiste ancora, lo crea
@@ -307,7 +307,7 @@ function saveToCloud() {
     db.collection("board").doc("data").set({
         notes: app.notes,
         settings: app.settings,
-        prisposte: app.prisposte,
+        pRisposte: app.pRisposte,
         pAbout: app.pAbout
     }).catch(error => {
         console.error("Errore di salvataggio su Firebase:", error);
