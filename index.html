@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dimostra che Dio non esiste</title>
+    <title>Prova che Dio non esiste</title>
     
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
@@ -83,7 +83,7 @@
         .modal-input { width: 100%; padding: 15px; border: 2px solid var(--border); border-radius: 14px; font-size: 1rem; margin-bottom: 20px; outline: none; transition: 0.3s; }
         .modal-input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1); }
 
-        /* SETTINGS */
+        /* SETTINGS SEMPLIFICATI */
         .settings-grid { display: grid; gap: 20px; }
         .card-inner { background: #f1f5f9; padding: 20px; border-radius: 15px; }
 
@@ -99,7 +99,7 @@
 
     <header>
         <div class="header-left">
-            <div class="logo">Puoi dimostrare che Dio non esiste?</div>
+            <div class="logo">Puoi provare che Dio non esiste?</div>
             <div class="user-tag" onclick="openNameModal()" id="userNameDisplay">Anonimo</div>
         </div>
         <nav>
@@ -142,20 +142,17 @@
             <h2 style="font-size: 2rem; margin-bottom:25px">Configurazione Notifiche</h2>
             <div class="note-card">
                 <div class="settings-grid">
-                    <div class="card-inner">
-                        <label style="font-weight:bold; display:block; margin-bottom:10px">Email Riceventi</label>
-                        <div style="display:flex; gap:10px">
-                            <input type="email" id="emailInput" class="modal-input" style="margin-bottom:0" placeholder="Inserisci email...">
-                            <button onclick="addEmail()" style="background:var(--primary); color:white; border:none; padding:0 25px; border-radius:12px; cursor:pointer">Aggiungi</button>
-                        </div>
-                        <div id="emailTags" style="margin-top:15px; display:flex; flex-wrap:wrap; gap:10px"></div>
-                    </div>
                     <div class="card-inner" style="display:flex; justify-content:space-between; align-items:center">
                         <div>
-                            <div style="font-weight:bold">Sistema Notifiche Attivo</div>
-                            <div style="font-size:0.8rem; color:var(--text-muted)">Disabilita per bloccare tutti gli invii</div>
+                            <div style="font-weight:bold">Sistema Notifiche Email</div>
+                            <div style="font-size:0.8rem; color:var(--text-muted)">Attiva/disattiva l'invio di tutte le notifiche</div>
                         </div>
                         <input type="checkbox" id="globalNotify" onchange="updateSettings()" style="width:30px; height:30px">
+                    </div>
+                    <div class="card-inner" style="background:#e6f7ff; border-left:4px solid var(--primary)">
+                        <div style="font-weight:bold; margin-bottom:8px">📧 Email di notifica configurata</div>
+                        <div style="font-size:0.9rem; color:var(--text-main)">simon.saccomani@gmail.com (fissa)</div>
+                        <div style="font-size:0.75rem; color:var(--text-muted); margin-top:8px">Le notifiche vengono inviate a questo indirizzo quando attive</div>
                     </div>
                 </div>
             </div>
@@ -194,8 +191,8 @@
 
                 <div id="ownerTriggers" class="hidden" style="background:#f0fdf4; padding:15px; border-radius:12px; border:1px solid #bbf7d0; margin-bottom:20px">
                     <p style="font-weight:bold; font-size:0.85rem; margin-bottom:10px">⚙️ Opzioni di Notifica (Solo Owner)</p>
-                    <label style="display:block; margin-bottom:8px; font-size:0.9rem"><input type="checkbox" id="triggerEdit"> Notifica su Modifica</label>
-                    <label style="display:block; font-size:0.9rem"><input type="checkbox" id="triggerComment"> Notifica su Commenti</label>
+                    <label style="display:block; margin-bottom:8px; font-size:0.9rem"><input type="checkbox" id="triggerEdit"> Ricevi notifica su Modifica</label>
+                    <label style="display:block; font-size:0.9rem"><input type="checkbox" id="triggerComment"> Ricevi notifica su Commenti</label>
                 </div>
 
                 <div style="display:grid; grid-template-columns: 1fr 1.5fr; gap:15px">
@@ -240,8 +237,9 @@ const db = firebase.firestore();
 
 // 2. Configurazione EmailJS
 const EJS_PUBLIC_KEY = "BiYrbb389y66x70Xk";
-const EJS_SERVICE_ID = "service_dxwwddd";
+const EJS_SERVICE_ID = "service_hs89aw4";
 const EJS_TEMPLATE_ID = "template_8qomkp7";
+const OWNER_EMAIL = "simon.saccomani@gmail.com"; // Email fissa del destinatario
 
 // Inizializzazione EmailJS
 emailjs.init(EJS_PUBLIC_KEY);
@@ -255,7 +253,7 @@ let app = {
     owner: false,
     user: localStorage.getItem('board_user') || 'Anonimo',
     notes: [],
-    settings: { emails: [], active: true },
+    settings: { active: true }, // settings ora contiene solo lo stato attivo/inattivo
     pRisposte: "Caricamento in corso...",
     pAbout: "Caricamento in corso..."
 };
@@ -269,7 +267,7 @@ window.onload = () => {
         if (doc.exists) {
             const data = doc.data();
             app.notes = data.notes || [];
-            app.settings = data.settings || { emails: [], active: true };
+            app.settings = data.settings || { active: true };
             app.pRisposte = data.pRisposte || "Vuoto";
             app.pAbout = data.pAbout || "Vuoto";
         } else {
@@ -473,20 +471,28 @@ function submitComment() {
     closeAllModals();
 }
 
-// --- NOTIFICHE EMAILJS ---
+// --- NOTIFICHE EMAILJS (SEMPLIFICATE) ---
 function notifyAll(title, msg) {
-    if(!app.settings.active || app.settings.emails.length === 0) return;
+    // Controlla solo se le notifiche sono attive globalmente
+    if(!app.settings.active) {
+        console.log("Notifiche disattivate globalmente");
+        return;
+    }
     
-    app.settings.emails.forEach(email => {
-        emailjs.send(EJS_SERVICE_ID, EJS_TEMPLATE_ID, {
-            title: title,
-            to_email: email,
-            message: msg
-        }).then(
-            () => console.log("Email inviata con successo a " + email),
-            (error) => console.error("Errore invio email a " + email, error)
-        );
-    });
+    // Invia email all'indirizzo fisso dell'owner
+    emailjs.send(EJS_SERVICE_ID, EJS_TEMPLATE_ID, {
+        title: title,                // Oggetto della notifica
+        name: app.user,              // Nome dell'utente che ha generato l'evento
+        message: msg                // Contenuto del messaggio
+    }).then(
+        (response) => {
+            console.log("✅ Notifica inviata con successo a " + OWNER_EMAIL, response);
+        },
+        (error) => {
+            console.error("❌ Errore invio notifica", error);
+            alert("Errore nell'invio della notifica. Verifica la configurazione di EmailJS.");
+        }
+    );
 }
 
 // --- PAGINE STATICHE ---
@@ -510,33 +516,15 @@ function savePageData(p) {
     renderStatic(p);
 }
 
-// --- SETTINGS ---
+// --- SETTINGS SEMPLIFICATI ---
 function renderSettings() {
-    const container = document.getElementById('emailTags');
-    container.innerHTML = '';
-    app.settings.emails.forEach((e, i) => {
-        container.innerHTML += `<div style="background:var(--primary); color:white; padding:5px 12px; border-radius:20px; font-size:0.8rem">${e} <span onclick="removeEmail(${i})" style="margin-left:8px; cursor:pointer; font-weight:bold">×</span></div>`;
-    });
     document.getElementById('globalNotify').checked = app.settings.active;
-}
-
-function addEmail() {
-    const em = document.getElementById('emailInput').value.trim();
-    if(em.includes('@')) { 
-        app.settings.emails.push(em); 
-        updateSettings(); 
-        document.getElementById('emailInput').value = ''; 
-    }
-}
-
-function removeEmail(i) { 
-    app.settings.emails.splice(i, 1); 
-    updateSettings(); 
 }
 
 function updateSettings() {
     app.settings.active = document.getElementById('globalNotify').checked;
     saveToCloud(); // Salva le impostazioni su Firebase
+    console.log("Notifiche " + (app.settings.active ? "attivate" : "disattivate"));
 }
 
 // --- RENDER NOTE ---
