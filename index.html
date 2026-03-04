@@ -3,69 +3,161 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="description" content="CloudBoard Ultra - Lavagna Virtuale Condivisa">
-    <title>CloudBoard Ultra</title>
-    
-    <link rel="stylesheet" href="style.css">
+    <title>Lavagna Virtuale Cloud Ultra</title>
     
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     
     <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --danger: #dc2626;
+            --success: #16a34a;
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            --radius: 16px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Roboto, sans-serif; }
+        
+        body { background-color: var(--bg); color: var(--text-main); padding-top: 85px; padding-bottom: 100px; min-height: 100vh; }
+
+        /* HEADER */
+        header { position: fixed; top: 0; width: 100%; background: var(--surface); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); z-index: 100; padding: 0 30px; height: 85px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
+        
+        .header-left { display: flex; align-items: center; gap: 25px; }
+        .logo { font-size: 1.5rem; font-weight: 900; color: var(--primary); letter-spacing: -1px; text-transform: uppercase; }
+        
+        /* USER PROFILE */
+        .user-tag { background: #f1f5f9; padding: 8px 18px; border-radius: 30px; font-size: 0.9rem; font-weight: 700; cursor: pointer; border: 2px solid transparent; transition: 0.3s; display: flex; align-items: center; gap: 8px; }
+        .user-tag:hover { border-color: var(--primary); background: #fff; }
+        .user-tag.is-owner-name { color: var(--danger) !important; background: #fee2e2; border-color: var(--danger); }
+        .user-tag.is-owner-name::before { content: '👑'; }
+
+        nav { display: flex; gap: 12px; }
+        nav button { background: transparent; border: none; color: var(--text-muted); font-size: 1rem; font-weight: 600; padding: 12px 20px; border-radius: 12px; cursor: pointer; transition: 0.2s; }
+        nav button.active { background: var(--primary); color: white; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3); }
+        
+        .owner-badge { background: var(--danger); color: white; padding: 5px 15px; border-radius: 50px; font-size: 0.75rem; font-weight: 900; text-transform: uppercase; display: none; box-shadow: 0 2px 5px rgba(220, 38, 38, 0.3); }
+
+        /* MAIN CONTENT */
+        main { max-width: 900px; margin: 0 auto; padding: 20px; }
+        .hidden { display: none !important; }
+
+        /* NOTE CARDS */
+        .note-card { background: var(--surface); border-radius: var(--radius); padding: 30px; margin-bottom: 30px; box-shadow: var(--shadow); border: 1px solid var(--border); transition: 0.3s; border-left: 6px solid var(--primary); }
+        .note-card:hover { transform: translateY(-5px); }
+        .note-header { display: flex; justify-content: space-between; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 15px; }
+        .note-author { font-size: 0.9rem; font-weight: 800; color: var(--primary); margin-bottom: 5px; display: block; }
+        .note-author.red-name { color: var(--danger); }
+        .note-title { font-size: 1.6rem; font-weight: 800; color: var(--text-main); line-height: 1.2; }
+        .note-meta { font-size: 0.8rem; color: var(--text-muted); text-align: right; }
+        .note-text { font-size: 1.1rem; line-height: 1.7; margin: 20px 0; white-space: pre-wrap; color: #334155; }
+        
+        /* NOTIFICATION BOX (OWNER ONLY) */
+        .owner-notif-status { background: #f0fdf4; border: 1px solid #bbf7d0; padding: 12px; border-radius: 10px; font-size: 0.85rem; margin-bottom: 20px; color: #166534; display: flex; gap: 10px; align-items: center; }
+
+        /* COMMENTI */
+        .comments-section { background: #f8fafc; border-radius: 12px; padding: 25px; margin-top: 25px; border: 1px solid var(--border); }
+        .comment { background: var(--surface); padding: 15px; border-radius: 10px; font-size: 1rem; margin-bottom: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); display: flex; justify-content: space-between; }
+        .comment-user { font-weight: 800; color: var(--text-main); margin-right: 10px; }
+        .comment-user.red-name { color: var(--danger); }
+
+        /* FAB */
+        .fab { position: fixed; bottom: 40px; right: 40px; width: 70px; height: 70px; border-radius: 50%; background: var(--primary); color: white; font-size: 40px; border: none; box-shadow: 0 10px 25px rgba(79, 70, 229, 0.4); cursor: pointer; z-index: 90; display: flex; align-items: center; justify-content: center; transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .fab:hover { transform: scale(1.15) rotate(90deg); background: var(--primary-hover); }
+
+        /* MODALI */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; visibility: hidden; transition: 0.3s; }
+        .modal-overlay.active { opacity: 1; visibility: visible; }
+        .modal-box { background: var(--surface); width: 95%; max-width: 550px; border-radius: 24px; padding: 40px; transform: translateY(30px); transition: 0.3s; max-height: 90vh; overflow-y: auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
+        .modal-overlay.active .modal-box { transform: translateY(0); }
+        
+        .modal-input { width: 100%; padding: 15px; border: 2px solid var(--border); border-radius: 14px; font-size: 1rem; margin-bottom: 20px; outline: none; transition: 0.3s; }
+        .modal-input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1); }
+
+        /* SETTINGS */
+        .settings-grid { display: grid; gap: 20px; }
+        .card-inner { background: #f1f5f9; padding: 20px; border-radius: 15px; }
+
+        @media (max-width: 600px) {
+            header { height: auto; padding: 20px; flex-direction: column; gap: 20px; position: static; }
+            body { padding-top: 0; }
+            nav { width: 100%; overflow-x: auto; padding-bottom: 10px; }
+            .header-left { width: 100%; justify-content: space-between; }
+        }
+    </style>
 </head>
 <body>
 
     <header>
-        <div class="header-content">
-            <div class="logo">CloudBoard DB</div>
-            <nav id="mainNav">
-                <button class="nav-btn active" data-target="lavagna">Bacheca</button>
-                <button class="nav-btn" data-target="domande">Domande</button>
-                <button id="navSettings" class="nav-btn hidden" data-target="settings">⚙️ Setup</button>
-            </nav>
-            <div class="user-controls">
-                <div id="userNameDisplay" class="user-tag">Anonimo</div>
-                <button id="loginBtn" class="btn-outline">Login</button>
-            </div>
+        <div class="header-left">
+            <div class="logo">CloudBoard</div>
+            <div class="user-tag" onclick="openNameModal()" id="userNameDisplay">Anonimo</div>
+        </div>
+        <nav>
+            <button class="active" onclick="navigate('lavagna')">Lavagna</button>
+            <button onclick="navigate('domande')">Domande</button>
+            <button onclick="navigate('about')">About</button>
+            <button id="navSettings" class="hidden" onclick="navigate('settings')">⚙️</button>
+        </nav>
+        <div>
+            <span id="ownerBadge" class="owner-badge">Admin Access</span>
+            <button id="loginBtn" style="padding: 10px 20px; border-radius: 12px; border: none; background: #0f172a; color: white; cursor: pointer; font-weight: 700;" onclick="openLoginModal()">Login</button>
         </div>
     </header>
 
     <main>
-        <section id="sec-lavagna" class="page-section">
-            <div id="notesContainer">
-                <div class="loading-state">Connessione al database di Google in corso...</div>
-            </div>
-            <button id="fabBtn" class="fab" aria-label="Aggiungi Nota">+</button>
+        <section id="sec-lavagna">
+            <div id="notesContainer"></div>
+            <button id="fabBtn" class="fab" onclick="openNoteModal()">+</button>
         </section>
 
-        <section id="sec-domande" class="page-section hidden">
-            <div class="section-header">
-                <h2>Area Risposte & Domande</h2>
-            </div>
-            <div id="domandeDisplay" class="note-card content-display">Caricamento in corso...</div>
+        <section id="sec-domande" class="hidden">
+            <h2 style="font-size: 2rem; margin-bottom:25px">Area Domande</h2>
+            <div id="domandeDisplay" class="note-card" style="min-height: 250px"></div>
             <div id="domandeEditMode" class="hidden">
-                <textarea id="domandeEditor" class="modal-input large-textarea"></textarea>
-                <button class="btn-main" id="saveDomandeBtn">Salva nel Cloud</button>
+                <textarea id="domandeEditor" class="modal-input" style="min-height:350px"></textarea>
+                <button class="modal-input" style="background:var(--primary); color:white; border:none; font-weight:bold" onclick="savePageData('domande')">Aggiorna Pagina</button>
             </div>
         </section>
 
-        <section id="sec-settings" class="page-section hidden">
-            <div class="section-header">
-                <h2>Pannello Notifiche EmailJS</h2>
+        <section id="sec-about" class="hidden">
+            <h2 style="font-size: 2rem; margin-bottom:25px">Informazioni</h2>
+            <div id="aboutDisplay" class="note-card" style="min-height: 250px"></div>
+            <div id="aboutEditMode" class="hidden">
+                <textarea id="aboutEditor" class="modal-input" style="min-height:350px"></textarea>
+                <button class="modal-input" style="background:var(--primary); color:white; border:none; font-weight:bold" onclick="savePageData('about')">Aggiorna Pagina</button>
             </div>
-            <div class="note-card settings-card">
-                <p class="text-muted">Le email verranno inviate ai seguenti indirizzi quando scattano i trigger Owner.</p>
-                <div class="input-group">
-                    <input type="email" id="emailInput" class="modal-input" placeholder="Aggiungi email ricevente...">
-                    <button id="addEmailBtn" class="btn-main">Aggiungi</button>
+        </section>
+
+        <section id="sec-settings" class="hidden">
+            <h2 style="font-size: 2rem; margin-bottom:25px">Configurazione Notifiche</h2>
+            <div class="note-card">
+                <div class="settings-grid">
+                    <div class="card-inner">
+                        <label style="font-weight:bold; display:block; margin-bottom:10px">Email Riceventi</label>
+                        <div style="display:flex; gap:10px">
+                            <input type="email" id="emailInput" class="modal-input" style="margin-bottom:0" placeholder="Inserisci email...">
+                            <button onclick="addEmail()" style="background:var(--primary); color:white; border:none; padding:0 25px; border-radius:12px; cursor:pointer">Aggiungi</button>
+                        </div>
+                        <div id="emailTags" style="margin-top:15px; display:flex; flex-wrap:wrap; gap:10px"></div>
+                    </div>
+                    <div class="card-inner" style="display:flex; justify-content:space-between; align-items:center">
+                        <div>
+                            <div style="font-weight:bold">Sistema Notifiche Attivo</div>
+                            <div style="font-size:0.8rem; color:var(--text-muted)">Disabilita per bloccare tutti gli invii</div>
+                        </div>
+                        <input type="checkbox" id="globalNotify" onchange="updateSettings()" style="width:30px; height:30px">
+                    </div>
                 </div>
-                <div id="emailTags" class="tags-container"></div>
-                
-                <hr class="divider">
-                <label class="toggle-label">
-                    <input type="checkbox" id="globalNotify" class="toggle-checkbox">
-                    <span class="toggle-text">Attiva sistema notifiche globale</span>
-                </label>
             </div>
         </section>
     </main>
@@ -73,63 +165,395 @@
     <div id="modalOverlay" class="modal-overlay">
         
         <div id="modalLogin" class="modal-box hidden">
-            <h2>Accesso Amministratore</h2>
-            <p class="text-muted">Inserisci la chiave master per attivare i privilegi Owner.</p>
-            <input type="password" id="ownerPwd" class="modal-input" placeholder="Password Master">
-            <div class="modal-actions">
-                <button class="btn-secondary close-modal-btn">Annulla</button>
-                <button id="validateOwnerBtn" class="btn-danger">Entra</button>
+            <h2 style="margin-bottom:25px">Area Riservata Owner</h2>
+            <input type="password" id="ownerPwd" class="modal-input" placeholder="Password di accesso">
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px">
+                <button class="modal-input" style="background:#f1f5f9; border:none" onclick="closeAllModals()">Annulla</button>
+                <button class="modal-input" style="background:var(--danger); color:white; border:none; font-weight:bold" onclick="validateOwner()">Sblocca</button>
             </div>
         </div>
 
         <div id="modalName" class="modal-box hidden">
-            <h2>Il Tuo Profilo</h2>
-            <p class="text-muted">Come vuoi apparire sulla bacheca?</p>
-            <input type="text" id="nameIn" class="modal-input" maxlength="20" placeholder="Esempio: Marco_99">
-            <div class="modal-actions single-action">
-                <button id="updateNameBtn" class="btn-main">Conferma Nome</button>
-            </div>
+            <h2>Personalizza Profilo</h2>
+            <p style="margin: 15px 0; color:var(--text-muted)">Inserisci il tuo nome (Max 20 caratteri).</p>
+            <input type="text" id="nameIn" class="modal-input" maxlength="20">
+            <button class="modal-input" style="background:var(--primary); color:white; border:none; font-weight:bold" onclick="updateProfileName()">Salva Nome</button>
         </div>
 
         <div id="modalNote" class="modal-box hidden">
-            <h2 id="noteHeader">Nuova Nota Online</h2>
-            <div class="modal-body">
-                <input type="text" id="noteTitle" class="modal-input" placeholder="Titolo della nota">
-                <textarea id="noteText" class="modal-input medium-textarea" placeholder="Scrivi il tuo pensiero qui..."></textarea>
-                <input type="text" id="notePass" class="modal-input" placeholder="Password segreta (per poterla modificare in futuro)">
+            <h2 id="noteHeader">Crea Nota</h2>
+            <div style="margin-top:20px">
+                <label style="font-size:0.8rem; font-weight:bold">Titolo</label>
+                <input type="text" id="noteTitle" class="modal-input">
+                
+                <label style="font-size:0.8rem; font-weight:bold">Contenuto</label>
+                <textarea id="noteText" class="modal-input" style="min-height:150px"></textarea>
+                
+                <label style="font-size:0.8rem; font-weight:bold">Password per modifiche</label>
+                <input type="text" id="notePass" class="modal-input">
 
-                <div id="ownerTriggers" class="owner-panel hidden">
-                    <p class="owner-panel-title">⚙️ Gestione Notifiche Avanzate</p>
-                    <label class="checkbox-label"><input type="checkbox" id="triggerEdit"> Avvisami via email se modificata</label>
-                    <label class="checkbox-label"><input type="checkbox" id="triggerComment"> Avvisami via email per nuovi commenti</label>
+                <div id="ownerTriggers" class="hidden" style="background:#f0fdf4; padding:15px; border-radius:12px; border:1px solid #bbf7d0; margin-bottom:20px">
+                    <p style="font-weight:bold; font-size:0.85rem; margin-bottom:10px">⚙️ Opzioni di Notifica (Solo Owner)</p>
+                    <label style="display:block; margin-bottom:8px; font-size:0.9rem"><input type="checkbox" id="triggerEdit"> Notifica su Modifica</label>
+                    <label style="display:block; font-size:0.9rem"><input type="checkbox" id="triggerComment"> Notifica su Commenti</label>
                 </div>
 
-                <div class="modal-actions">
-                    <button class="btn-secondary close-modal-btn">Esci</button>
-                    <button id="btnSubmitNote" class="btn-main">Pubblica sul Cloud</button>
+                <div style="display:grid; grid-template-columns: 1fr 1.5fr; gap:15px">
+                    <button class="modal-input" style="background:#f1f5f9; border:none" onclick="closeAllModals()">Chiudi</button>
+                    <button class="modal-input" style="background:var(--primary); color:white; border:none; font-weight:bold" onclick="submitNote()">Pubblica Ora</button>
                 </div>
             </div>
         </div>
 
         <div id="modalVerify" class="modal-box hidden">
-            <h2>Azione Protetta</h2>
-            <p class="text-muted">Inserisci la password impostata dall'autore della nota.</p>
+            <h2>Verifica Identità</h2>
+            <p style="margin:15px 0">Inserisci la password segreta della nota.</p>
             <input type="password" id="verifyPass" class="modal-input">
-            <div class="modal-actions single-action">
-                <button id="verifyBtn" class="btn-main">Sblocca</button>
-            </div>
+            <button id="verifyBtn" class="modal-input" style="background:var(--primary); color:white; border:none; font-weight:bold">Conferma</button>
         </div>
 
         <div id="modalComment" class="modal-box hidden">
-            <h2>Scrivi una risposta</h2>
-            <textarea id="commText" class="modal-input medium-textarea" placeholder="Il tuo commento costruttivo..."></textarea>
-            <div class="modal-actions single-action">
-                <button id="submitCommBtn" class="btn-main">Invia Commento</button>
-            </div>
+            <h2>Aggiungi Commento</h2>
+            <textarea id="commText" class="modal-input" style="margin-top:20px; min-height:120px" placeholder="Scrivi qui il tuo messaggio anonimo..."></textarea>
+            <button class="modal-input" style="background:var(--primary); color:white; border:none; font-weight:bold" onclick="submitComment()">Invia</button>
         </div>
 
     </div>
 
-    <script src="app.js"></script>
+    <script>
+        // --- CONFIGURAZIONE SERVIZI ESTERNI ---
+        
+        // 1. Incolla qui il tuo config di Firebase
+        const firebaseConfig = {
+            apiKey: "IL-TUO-API-KEY",
+            authDomain: "TUO-PROGETTO.firebaseapp.com",
+            projectId: "TUO-PROGETTO",
+            storageBucket: "TUO-PROGETTO.appspot.com",
+            messagingSenderId: "ID",
+            appId: "APP-ID"
+        };
+
+        // 2. Incolla qui i tuoi dati EmailJS
+        const EJS_PUBLIC_KEY = "TUA_PUBLIC_KEY";
+        const EJS_SERVICE_ID = "TUO_SERVICE_ID";
+        const EJS_TEMPLATE_ID = "TUO_TEMPLATE_ID";
+
+        // Inizializzazione (se firebaseConfig è valido)
+        if(firebaseConfig.apiKey !== "IL-TUO-API-KEY") {
+            firebase.initializeApp(firebaseConfig);
+            var db = firebase.firestore();
+        } else {
+            console.warn("Firebase non configurato. Uso LocalStorage.");
+        }
+
+        emailjs.init(EJS_PUBLIC_KEY);
+
+        // --- STATO APPLICAZIONE ---
+        const MASTER_KEY_OBF = "Q2ljY2lvYmVsbG8="; // "Cicciobello"
+        const getMaster = () => atob(MASTER_KEY_OBF);
+
+        let app = {
+            owner: false,
+            user: localStorage.getItem('board_user') || 'Anonimo',
+            notes: JSON.parse(localStorage.getItem('board_notes')) || [],
+            settings: JSON.parse(localStorage.getItem('board_settings')) || { emails: [], active: true },
+            pDomande: localStorage.getItem('board_domande') || "Vuoto",
+            pAbout: localStorage.getItem('board_about') || "Vuoto"
+        };
+
+        let activeId = null;
+
+        // --- CARICAMENTO ---
+        window.onload = () => {
+            syncUI();
+            navigate('lavagna');
+        };
+
+        function syncUI() {
+            const tag = document.getElementById('userNameDisplay');
+            if(app.owner) {
+                app.user = "Owner";
+                tag.classList.add('is-owner-name');
+            } else {
+                tag.classList.remove('is-owner-name');
+                if(app.user === "Owner") app.user = "Anonimo";
+            }
+            tag.innerText = app.user;
+            renderNotes();
+            renderSettings();
+        }
+
+        // --- NAVIGAZIONE ---
+        function navigate(page) {
+            document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+            ['lavagna', 'domande', 'about', 'settings'].forEach(s => document.getElementById(`sec-${s}`).classList.add('hidden'));
+            document.getElementById(`sec-${page}`).classList.remove('hidden');
+            
+            const activeBtn = Array.from(document.querySelectorAll('nav button')).find(b => b.innerText.toLowerCase().includes(page));
+            if(activeBtn) activeBtn.classList.add('active');
+
+            if(page === 'domande' || page === 'about') renderStatic(page);
+            document.getElementById('fabBtn').style.display = (page === 'lavagna') ? 'flex' : 'none';
+        }
+
+        // --- LOGIN OWNER ---
+        function openLoginModal() {
+            if(app.owner) {
+                app.owner = false;
+                document.getElementById('loginBtn').innerText = "Login";
+                document.getElementById('ownerBadge').style.display = 'none';
+                document.getElementById('navSettings').classList.add('hidden');
+                syncUI();
+            } else {
+                showModal('modalLogin');
+            }
+        }
+
+        function validateOwner() {
+            const p = document.getElementById('ownerPwd').value;
+            if(p === getMaster()) {
+                app.owner = true;
+                document.getElementById('loginBtn').innerText = "Logout";
+                document.getElementById('ownerBadge').style.display = 'inline-block';
+                document.getElementById('navSettings').classList.remove('hidden');
+                closeAllModals();
+                syncUI();
+            } else alert("Accesso Negato");
+            document.getElementById('ownerPwd').value = '';
+        }
+
+        // --- PROFILO UTENTE ---
+        function openNameModal() {
+            if(app.owner) return;
+            document.getElementById('nameIn').value = app.user;
+            showModal('modalName');
+        }
+
+        function updateProfileName() {
+            const n = document.getElementById('nameIn').value.trim();
+            app.user = n.substring(0, 20) || "Anonimo";
+            localStorage.setItem('board_user', app.user);
+            syncUI();
+            closeAllModals();
+        }
+
+        // --- GESTIONE NOTE ---
+        function openNoteModal(id = null) {
+            activeId = id;
+            const tIn = document.getElementById('noteTitle');
+            const txtIn = document.getElementById('noteText');
+            const passIn = document.getElementById('notePass');
+            const triggers = document.getElementById('ownerTriggers');
+
+            if(id) {
+                const n = app.notes.find(x => x.id === id);
+                tIn.value = n.title;
+                txtIn.value = n.text;
+                passIn.value = n.password;
+                document.getElementById('noteHeader').innerText = "Modifica Nota";
+                
+                if(app.owner) {
+                    triggers.classList.remove('hidden');
+                    document.getElementById('triggerEdit').checked = n.notifyEdit || false;
+                    document.getElementById('triggerComment').checked = n.notifyComm || false;
+                } else {
+                    triggers.classList.add('hidden');
+                }
+            } else {
+                tIn.value = ''; txtIn.value = ''; passIn.value = '';
+                document.getElementById('noteHeader').innerText = "Nuova Nota";
+                triggers.classList.add('hidden');
+            }
+            showModal('modalNote');
+        }
+
+        function submitNote() {
+            const t = document.getElementById('noteTitle').value.trim();
+            const txt = document.getElementById('noteText').value.trim();
+            const p = document.getElementById('notePass').value.trim();
+
+            if(!t || !txt || !p) return alert("Compila tutto!");
+
+            if(activeId) {
+                const i = app.notes.findIndex(x => x.id === activeId);
+                const old = app.notes[i];
+                app.notes[i] = {
+                    ...old, title: t, text: txt, password: p,
+                    edited: new Date().toLocaleString(),
+                    notifyEdit: app.owner ? document.getElementById('triggerEdit').checked : old.notifyEdit,
+                    notifyComm: app.owner ? document.getElementById('triggerComment').checked : old.notifyComm
+                };
+                if(app.notes[i].notifyEdit) notifyAll(t, "Nota Modificata: " + txt);
+            } else {
+                const nuovo = {
+                    id: Date.now().toString(),
+                    author: app.user,
+                    title: t, text: txt, password: p,
+                    date: new Date().toLocaleString(),
+                    comments: [],
+                    notifyEdit: false, notifyComm: false
+                };
+                app.notes.unshift(nuovo);
+                notifyAll(t, "Nuova Nota Creata: " + txt);
+            }
+            save();
+            closeAllModals();
+        }
+
+        function checkAction(id, type) {
+            activeId = id;
+            if(app.owner) {
+                if(type === 'edit') openNoteModal(id);
+                else if(confirm("Eliminare?")) { app.notes = app.notes.filter(x => x.id !== id); save(); }
+            } else {
+                showModal('modalVerify');
+                document.getElementById('verifyBtn').onclick = () => {
+                    const pass = document.getElementById('verifyPass').value;
+                    const n = app.notes.find(x => x.id === id);
+                    if(pass === n.password) {
+                        closeAllModals();
+                        if(type === 'edit') openNoteModal(id);
+                        else { if(confirm("Sicuro?")) { app.notes = app.notes.filter(x => x.id !== id); save(); } }
+                    } else alert("Errata");
+                    document.getElementById('verifyPass').value = '';
+                };
+            }
+        }
+
+        // --- COMMENTI ---
+        function openComment(id) { activeId = id; showModal('modalComment'); }
+
+        function submitComment() {
+            const txt = document.getElementById('commText').value.trim();
+            if(!txt) return;
+            const i = app.notes.findIndex(x => x.id === activeId);
+            app.notes[i].comments.push({ user: app.user, text: txt, time: new Date().toLocaleString() });
+            
+            if(app.notes[i].notifyComm) notifyAll(app.notes[i].title, `Nuovo commento da ${app.user}: ${txt}`);
+
+            document.getElementById('commText').value = '';
+            save();
+            closeAllModals();
+        }
+
+        // --- NOTIFICHE EMAILJS ---
+        function notifyAll(title, msg) {
+            if(!app.settings.active || app.settings.emails.length === 0) return;
+            
+            app.settings.emails.forEach(email => {
+                emailjs.send(EJS_SERVICE_ID, EJS_TEMPLATE_ID, {
+                    subject: "NOTIFICA SITO (" + title + ")",
+                    to_email: email,
+                    message: msg
+                }).then(() => console.log("Email inviata a " + email));
+            });
+        }
+
+        // --- PAGINE STATICHE ---
+        function renderStatic(p) {
+            const disp = document.getElementById(`${p}Display`);
+            const edit = document.getElementById(`${p}EditMode`);
+            if(app.owner) {
+                disp.classList.add('hidden'); edit.classList.remove('hidden');
+                document.getElementById(`${p}Editor`).value = app[`p${p.charAt(0).toUpperCase() + p.slice(1)}`];
+            } else {
+                edit.classList.add('hidden'); disp.classList.remove('hidden');
+                disp.innerText = app[`p${p.charAt(0).toUpperCase() + p.slice(1)}`];
+            }
+        }
+
+        function savePageData(p) {
+            const val = document.getElementById(`${p}Editor`).value;
+            app[`p${p.charAt(0).toUpperCase() + p.slice(1)}`] = val;
+            localStorage.setItem(`board_${p}`, val);
+            alert("Pagina Aggiornata!");
+            renderStatic(p);
+        }
+
+        // --- SETTINGS ---
+        function renderSettings() {
+            const container = document.getElementById('emailTags');
+            container.innerHTML = '';
+            app.settings.emails.forEach((e, i) => {
+                container.innerHTML += `<div style="background:var(--primary); color:white; padding:5px 12px; border-radius:20px; font-size:0.8rem">${e} <span onclick="removeEmail(${i})" style="margin-left:8px; cursor:pointer; font-weight:bold">×</span></div>`;
+            });
+            document.getElementById('globalNotify').checked = app.settings.active;
+        }
+
+        function addEmail() {
+            const em = document.getElementById('emailInput').value.trim();
+            if(em.includes('@')) { app.settings.emails.push(em); updateSettings(); document.getElementById('emailInput').value = ''; }
+        }
+
+        function removeEmail(i) { app.settings.emails.splice(i, 1); updateSettings(); }
+
+        function updateSettings() {
+            app.settings.active = document.getElementById('globalNotify').checked;
+            localStorage.setItem('board_settings', JSON.stringify(app.settings));
+            renderSettings();
+        }
+
+        // --- RENDER NOTE ---
+        function renderNotes() {
+            const container = document.getElementById('notesContainer');
+            container.innerHTML = app.notes.length ? '' : '<div style="text-align:center; padding:50px; color:var(--text-muted)">Nessuna nota presente.</div>';
+            
+            app.notes.forEach(n => {
+                const isOwnerNote = n.author === "Owner";
+                let comms = n.comments.map((c, i) => `
+                    <div class="comment">
+                        <div>
+                            <span class="comment-user ${c.user === 'Owner' ? 'red-name' : ''}">${c.user}</span>
+                            <span style="font-size:0.7rem; color:var(--text-muted)">${c.time}</span>
+                            <div style="margin-top:5px">${c.text}</div>
+                        </div>
+                        ${app.owner ? `<button onclick="delComment('${n.id}', ${i})" style="border:none; color:red; background:none; cursor:pointer; font-size:1.2rem">×</button>` : ''}
+                    </div>
+                `).join('');
+
+                container.innerHTML += `
+                    <div class="note-card">
+                        <div class="note-header">
+                            <div>
+                                <span class="note-author ${isOwnerNote ? 'red-name' : ''}">Autore: ${n.author}</span>
+                                <div class="note-title">${n.title}</div>
+                            </div>
+                            <div class="note-meta">${n.date} ${n.edited ? `<br><span style="color:orange">Modificata: ${n.edited}</span>` : ''}</div>
+                        </div>
+                        ${app.owner ? `<div style="background:#eff6ff; padding:8px; border-radius:8px; font-size:0.75rem; color:blue; margin-bottom:15px; font-family:monospace"><b>Owner Info:</b> Pass -> ${n.password} | Notifiche: ${n.notifyEdit?'Ed':'No'}/${n.notifyComm?'Co':'No'}</div>` : ''}
+                        <div class="note-text">${n.text}</div>
+                        <div style="display:flex; gap:12px; margin-bottom:20px">
+                            <button class="user-tag" style="background:none" onclick="checkAction('${n.id}', 'edit')">✏️ Modifica</button>
+                            <button class="user-tag" style="background:none; color:var(--danger)" onclick="checkAction('${n.id}', 'del')">🗑️ Elimina</button>
+                            <button class="user-tag" style="background:var(--primary); color:white; border:none" onclick="openComment('${n.id}')">💬 Rispondi</button>
+                        </div>
+                        <div class="comments-section">
+                            <div style="font-weight:900; font-size:0.75rem; margin-bottom:15px; color:var(--text-muted); text-transform:uppercase">Discussione (${n.comments.length})</div>
+                            ${comms}
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function delComment(nId, cIdx) {
+            const i = app.notes.findIndex(x => x.id === nId);
+            app.notes[i].comments.splice(cIdx, 1);
+            save();
+        }
+
+        function save() {
+            localStorage.setItem('board_notes', JSON.stringify(app.notes));
+            renderNotes();
+        }
+
+        function showModal(id) {
+            document.querySelectorAll('.modal-box').forEach(b => b.classList.add('hidden'));
+            document.getElementById(id).classList.remove('hidden');
+            document.getElementById('modalOverlay').classList.add('active');
+        }
+
+        function closeAllModals() { document.getElementById('modalOverlay').classList.remove('active'); }
+    </script>
 </body>
 </html>
