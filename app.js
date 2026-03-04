@@ -3,7 +3,7 @@
  * Powered by Firebase & EmailJS
  */
 
-// --- 1. CONFIGURAZIONE CHIAVI API ---
+// --- 1. CONFIGURAZIONE CHIAVI API (INSERISCI I TUOI DATI QUI) ---
 const firebaseConfig = {
   apiKey: "AIzaSyDInnrtoQngbkvE6ngcHaXL02a0XryA6hQ",
   authDomain: "clouboard.firebaseapp.com",
@@ -32,56 +32,47 @@ let appState = {
     username: localStorage.getItem('cloudboard_user') || 'Anonimo',
     settings: { emails: [], active: true },
     activeNoteId: null,
-    actionType: null // 'edit' o 'delete'
+    actionType: null
 };
 
 // --- 3. GESTIONE DOM E EVENT LISTENERS ---
 document.addEventListener('DOMContentLoaded', () => {
-    // Navigazione
     document.querySelectorAll('.nav-btn').forEach(btn => {
         btn.addEventListener('click', (e) => switchPage(e.target.dataset.target));
     });
 
-    // Modali - Apertura
     document.getElementById('loginBtn').addEventListener('click', handleLoginClick);
     document.getElementById('userNameDisplay').addEventListener('click', () => {
         if (!appState.isOwner) showModal('modalName');
     });
     document.getElementById('fabBtn').addEventListener('click', () => openNoteModal());
 
-    // Modali - Chiusura
     document.querySelectorAll('.close-modal-btn').forEach(btn => {
         btn.addEventListener('click', closeAllModals);
     });
 
-    // Azioni Modali
     document.getElementById('validateOwnerBtn').addEventListener('click', validateOwner);
     document.getElementById('updateNameBtn').addEventListener('click', updateUsername);
     document.getElementById('btnSubmitNote').addEventListener('click', submitNote);
     document.getElementById('verifyBtn').addEventListener('click', executeProtectedAction);
     document.getElementById('submitCommBtn').addEventListener('click', submitComment);
     
-    // Settings & Pagine
     document.getElementById('saveDomandeBtn').addEventListener('click', saveDomandePage);
     document.getElementById('addEmailBtn').addEventListener('click', addEmailConfig);
     document.getElementById('globalNotify').addEventListener('change', updateSettingsInDB);
 
-    // Avvio iniziale
     updateUserInterface();
     startRealtimeSync();
 });
 
 // --- 4. FUNZIONI DI NAVIGAZIONE E UI ---
 function switchPage(pageId) {
-    // Update Buttons
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
     document.querySelector(`[data-target="${pageId}"]`).classList.add('active');
 
-    // Update Sections
     document.querySelectorAll('.page-section').forEach(s => s.classList.add('hidden'));
     document.getElementById(`sec-${pageId}`).classList.remove('hidden');
 
-    // Gestione specifica per "Domande"
     if (pageId === 'domande') {
         const display = document.getElementById('domandeDisplay');
         const editor = document.getElementById('domandeEditMode');
@@ -95,7 +86,6 @@ function switchPage(pageId) {
         }
     }
 
-    // Toggle FAB
     document.getElementById('fabBtn').style.display = (pageId === 'lavagna') ? 'flex' : 'none';
 }
 
@@ -120,7 +110,6 @@ function updateUserInterface() {
 // --- 5. GESTIONE AUTENTICAZIONE E UTENTE ---
 function handleLoginClick() {
     if (appState.isOwner) {
-        // Esegui Logout ricaricando lo stato
         appState.isOwner = false;
         appState.username = localStorage.getItem('cloudboard_user') || 'Anonimo';
         switchPage('lavagna');
@@ -153,9 +142,8 @@ function updateUsername() {
     }
 }
 
-// --- 6. SINCRONIZZAZIONE FIRESTORE (REAL-TIME) ---
+// --- 6. SINCRONIZZAZIONE FIRESTORE ---
 function startRealtimeSync() {
-    // Sync Note
     db.collection("notes").orderBy("createdAt", "desc").onSnapshot(
         (snapshot) => {
             const notesArray = [];
@@ -164,11 +152,10 @@ function startRealtimeSync() {
         },
         (error) => {
             console.error("Errore sync Firestore:", error);
-            document.getElementById('notesContainer').innerHTML = `<div class="loading-state text-danger">Errore di connessione al database.</div>`;
+            document.getElementById('notesContainer').innerHTML = `<div class="loading-state text-danger">Database non configurato o offline.</div>`;
         }
     );
 
-    // Sync Impostazioni Globali
     db.collection("config").doc("global").onSnapshot((doc) => {
         if (doc.exists()) {
             const data = doc.data();
@@ -183,7 +170,6 @@ function startRealtimeSync() {
 async function openNoteModal(noteId = null) {
     appState.activeNoteId = noteId;
     
-    // Setup UI Modale
     const triggersPanel = document.getElementById('ownerTriggers');
     appState.isOwner ? triggersPanel.classList.remove('hidden') : triggersPanel.classList.add('hidden');
 
@@ -195,8 +181,8 @@ async function openNoteModal(noteId = null) {
             document.getElementById('noteTitle').value = noteData.title;
             document.getElementById('noteText').value = noteData.text;
             document.getElementById('notePass').value = noteData.password;
-            document.getElementById('triggerEdit').checked = noteData.notifyEdit;
-            document.getElementById('triggerComment').checked = noteData.notifyComm;
+            document.getElementById('triggerEdit').checked = noteData.notifyEdit || false;
+            document.getElementById('triggerComment').checked = noteData.notifyComm || false;
         } catch (e) {
             console.error(e);
             alert("Errore nel recupero della nota.");
@@ -227,12 +213,10 @@ async function submitNote() {
 
     try {
         if (appState.activeNoteId) {
-            // Aggiornamento
             const oldDoc = await db.collection("notes").doc(appState.activeNoteId).get();
             if (oldDoc.data().notifyEdit) triggerEmail("MODIFICA NOTA", `La nota "${title}" è stata modificata da ${appState.username}.`);
             await db.collection("notes").doc(appState.activeNoteId).update(notePayload);
         } else {
-            // Creazione
             notePayload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
             notePayload.comments = [];
             await db.collection("notes").add(notePayload);
@@ -245,13 +229,11 @@ async function submitNote() {
     }
 }
 
-// Flusso di Verifica (Modifica/Elimina)
 function initiateProtectedAction(noteId, action) {
     appState.activeNoteId = noteId;
     appState.actionType = action;
 
     if (appState.isOwner) {
-        // L'owner bypassa la password
         if (action === 'edit') openNoteModal(noteId);
         else if (confirm("Eliminare definitivamente?")) deleteNote(noteId);
     } else {
@@ -280,7 +262,6 @@ async function deleteNote(id) {
     await db.collection("notes").doc(id).delete();
 }
 
-// Logica Commenti
 function promptComment(noteId) {
     appState.activeNoteId = noteId;
     document.getElementById('commText').value = '';
@@ -435,5 +416,4 @@ function showModal(modalId) {
 
 function closeAllModals() {
     document.getElementById('modalOverlay').classList.remove('active');
-
 }
