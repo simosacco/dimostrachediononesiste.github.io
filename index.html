@@ -530,7 +530,7 @@ function updateSettings() {
 // --- RENDER NOTE ---
 function renderNotes() {
     const container = document.getElementById('notesContainer');
-    container.innerHTML = app.notes.length ? '' : '<div style="text-align:center; padding:50px; color:var(--text-muted)">Nessuna nota presente nel database.</div>';
+    container.innerHTML = app.notes.length ? '' : '<div style="text-align:center; padding:50px; color:var(--text-muted)">Nessuna prova presente nel database.</div>';
     
     app.notes.forEach(n => {
         const isOwnerNote = n.author === "Owner";
@@ -588,4 +588,3 @@ function closeAllModals() {
     </script>
 </body>
 </html>
-
